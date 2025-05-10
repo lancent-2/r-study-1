@@ -1,58 +1,45 @@
+# 02_plot.R --------------------------------------------------------------
 library(ggplot2)
 library(patchwork)
-library(tidyr)
+library(ggpmisc)
+library(ggpubr)
 
-# 绘制降水趋势图
 plot_trend <- function(data, var_name, color, title) {
-  y_range <- range(data[[var_name]], na.rm = TRUE)
-  y_breaks <- pretty(y_range, n = 5)
+  if (!var_name %in% names(data)) {
+    stop("列名 '", var_name, "' 在数据中不存在")
+  }
   
   ggplot(data, aes(x = Year, y = .data[[var_name]])) +
-    geom_line(color = color, linewidth = 1) +
-    geom_point(color = color, size = 3) +
+    geom_line(color = color, linewidth = 1, alpha = 0.8) +
+    geom_point(color = color, size = 3, shape = 21, fill = "white", stroke = 1.5) +
     labs(title = title, x = "年份", y = "降水量 (mm)") +
-    scale_x_continuous(breaks = seq(1980, 2008, by = 5)) +
-    scale_y_continuous(
-      breaks = y_breaks,
-      limits = c(min(y_breaks), max(y_breaks))  # 动态限制纵轴范围
-    ) +
+    scale_x_continuous(breaks = scales::breaks_pretty(n = 8)) +
+    geom_smooth(method = "lm", se = FALSE, color = "gray40", linetype = "dashed") +
+    ggpmisc::stat_poly_eq(use_label(c("eq", "R2")), label.x = 0.1, label.y = 0.95) +
     THEME_CUSTOM
 }
 
-# 绘制降水-展叶期关系图
-plot_correlation <- function(rain_data, ginkgo_data) {
-  merged <- merge(rain_data, ginkgo_data, by = "Year")
-  
-  # 动态设置坐标轴范围
-  x_range <- range(merged$Critical)
-  y_range <- range(merged$Leafing_Day)
-  
-  ggplot(merged, aes(x = Critical, y = Leafing_Day)) +
-    geom_point(
-      color = COLOR_GINKGO, 
-      size = 4, 
-      alpha = 0.6,          # 增加透明度
-      position = position_jitter(width = 0.02, height = 0.5)  # 添加轻微抖动
+plot_correlation <- function(data, color_point, color_line) {
+  ggplot(data, aes(x = Critical, y = Leafing_Day)) +
+    geom_point(color = color_point, size = 4, alpha = 0.7, shape = 17) +
+    geom_smooth(
+      method = "lm",
+      formula = y ~ x,
+      color = color_line,
+      se = TRUE,
+      fill = "gray80"
     ) +
-    geom_smooth(method = "lm", color = COLOR_RAIN, se = TRUE) +
     labs(
-      title = "北京2-4月降水量与银杏展叶期关系",
-      x = "2-4月累计降水量 (mm)", 
-      y = "展叶日（年序日）"
+      x = "2-4月降水量 (mm)",
+      y = "展叶日（年序日）",
+      title = "关键期降水量与展叶日相关性"
     ) +
-    scale_x_continuous(
-      breaks = scales::breaks_extended(n = 5),  # 自动生成5个合理刻度
-      labels = scales::label_number(accuracy = 1),
-      limits = c(x_range[1] * 0.98, x_range[2] * 1.02)  # 扩展2%范围
+    ggpubr::stat_cor(
+      method = "pearson",
+      label.x.npc = 0.05,
+      label.y.npc = 0.95,
+      size = 4.5,
+      color = "black"
     ) +
-    scale_y_continuous(
-      breaks = scales::breaks_extended(n = 5),
-      limits = c(y_range[1] - 2, y_range[2] + 2)  # 扩展2天范围
-    ) +
-    annotate("text", 
-             x = x_range[2] * 0.85, 
-             y = y_range[1] + 3,  # 调整标注位置
-             label = paste0("R² = ", round(cor(merged$Critical, merged$Leafing_Day)^2, 2)),
-             color = "black", size = 5) +
     THEME_CUSTOM
 }
